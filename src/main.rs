@@ -193,14 +193,21 @@ fn create_tab(window: &Window, context: &mut WebContext, url: &str, event_loop_p
 
 fn load_url_in_current_tab(tab: &mut Tab, url: &str) {
     println!("Loading URL in current tab: {}", url);
-    let script = format!("loadUrl('{}');", url);
+    let script = format!(
+        r#"
+        loadUrl('{}').then(() => {{
+            updateTabUI('{}');
+        }});
+        "#,
+        url, url
+    );
     match tab.webview.evaluate_script(&script) {
         Ok(_) => {
             tab.url = url.to_string();
-            println!("Successfully loaded URL: {}", url);
+            println!("Successfully initiated URL load: {}", url);
         },
         Err(e) => {
-            println!("Error loading URL {}: {:?}", url, e);
+            println!("Error initiating URL load {}: {:?}", url, e);
         }
     }
 }
@@ -231,10 +238,8 @@ fn update_tab_ui(tabs: &[Tab], current_tab: usize) {
     
     let script = format!(
         r#"
-        document.getElementById('tab-bar').innerHTML = "{}";
-        document.getElementById('url-input').value = "{}";
+        updateTabUI('{}');
         "#,
-        tab_list,
         tabs[current_tab].url
     );
 

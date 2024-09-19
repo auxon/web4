@@ -102,7 +102,7 @@ function loadUrl(url) {
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
         url = 'https://' + url;
     }
-    fetch('http://localhost:3030/load?url=' + encodeURIComponent(url))
+    return fetch('http://localhost:3030/load?url=' + encodeURIComponent(url))
         .then(response => response.json())
         .then(data => {
             const contentArea = document.getElementById('content-area');
@@ -157,6 +157,12 @@ function updateAddressBar() {
     }
 }
 
+// Function to update the tab UI
+function updateTabUI(url) {
+    document.getElementById('url-input').value = url;
+    document.getElementById('browser-chrome').style.display = 'block';
+}
+
 // Initialize the page
 // Note: We're not calling initializePage() here anymore, it will be called from Rust with the initial URL
 
@@ -165,3 +171,4 @@ window.loadUrl = loadUrl;
 window.switchTab = switchTab;
 window.createNewTab = createNewTab;
 window.setupEventListeners = setupEventListeners;
+window.updateTabUI = updateTabUI;
