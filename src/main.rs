@@ -2,7 +2,6 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use warp::Filter;
-use warp::http::header::{HeaderMap, HeaderValue, ACCESS_CONTROL_ALLOW_ORIGIN, ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_HEADERS};
 use crate::engine::BrowserEngine;
 use tao::{
     event::{Event, StartCause, WindowEvent, ElementState},
@@ -35,19 +34,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let engine_filter = warp::any().map(move || Arc::clone(&engine));
 
-    let cors = warp::reply::with::headers(HeaderMap::from_iter(vec![
-        (ACCESS_CONTROL_ALLOW_ORIGIN, HeaderValue::from_static("*")),
-        (ACCESS_CONTROL_ALLOW_METHODS, HeaderValue::from_static("GET, POST, OPTIONS")),
-        (ACCESS_CONTROL_ALLOW_HEADERS, HeaderValue::from_static("Content-Type")),
-    ]));
+    let cors = warp::cors()
+    .allow_any_origin()
+    .allow_methods(vec!["GET", "POST", "OPTIONS"])
+    .allow_headers(vec!["Content-Type"]);
 
     // Handle GET /load?url=...
     let load_url_get = warp::get()
-        .and(warp::path("load"))
-        .and(warp::query::<std::collections::HashMap<String, String>>())
-        .and(engine_filter.clone())
-        .and_then(handle_load_url_get)
-        .with(cors.clone());
+    .and(warp::path("load"))
+    .and(warp::query::<std::collections::HashMap<String, String>>())
+    .and(engine_filter.clone())
+    .and_then(handle_load_url_get)
+    .with(warp::reply::with::header(
+        "Content-Security-Policy",
+        "default-src * 'unsafe-inline' 'unsafe-eval'; img-src * data: blob:;"
+    ))
+    .with(warp::reply::with::header(
+        "Content-Type",
+        "application/json"
+    ))
+    .with(cors.clone());
 
     // Handle GET /
     let index = warp::get()
@@ -55,7 +61,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map(|| warp::reply::html(include_str!("index.html")))
         .with(cors.clone());
 
-    let routes = load_url_get.or(index);
+    
+    let routes = load_url_get.or(index).with(cors.clone());
+
+    let csp = "default-src 'self' https: data: 'unsafe-inline' 'unsafe-eval'; img-src 'self' https: data: blob:; object-src 'self' https:; style-src 'self' https: 'unsafe-inline';";
+
+    let routes = warp::any()
+        .and(warp::header::exact("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"))
+        .and(routes)
+        .with(cors.clone())  // Clone cors here
+        .with(warp::reply::with::header("Content-Security-Policy", csp));
 
     let server_ready = Arc::new(AtomicBool::new(false));
     let server_ready_clone = server_ready.clone();
@@ -117,7 +132,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         KeyCode::KeyT => {
                             // Create a new tab (Ctrl+T)
                             if modifiers.control_key() {
-                                if let Ok(new_tab) = create_tab(&window, &mut web_context, "http://localhost:3030", &event_loop_proxy) {
+                                if let Ok(new_tab) = create_tab(&window, &mut web_context, "https://www.google.com", &event_loop_proxy) {
                                     tabs.push(new_tab);
                                     current_tab = tabs.len() - 1;
                                     update_tab_ui(&tabs, current_tab);
@@ -143,7 +158,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 update_tab_ui(&tabs, current_tab);
             },
             Event::UserEvent(UserEvent::CreateNewTab) => {
-                if let Ok(new_tab) = create_tab(&window, &mut web_context, "http://localhost:3030", &event_loop_proxy) {
+                if let Ok(new_tab) = create_tab(&window, &mut web_context, "https://www.google.com", &event_loop_proxy) {
                     tabs.push(new_tab);
                     current_tab = tabs.len() - 1;
                     update_tab_ui(&tabs, current_tab);
@@ -163,15 +178,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 fn create_tab(window: &Window, context: &mut WebContext, url: &str, event_loop_proxy: &EventLoopProxy<UserEvent>) -> Result<Tab, Box<dyn std::error::Error>> {
     let event_loop_proxy = event_loop_proxy.clone();
     println!("Creating new tab with URL: {}", url);
-    let html_content = include_str!("index.html");
-    println!("HTML content length: {}", html_content.len());
+
     let webview = WebViewBuilder::new(window)
         .with_web_context(context)
-        .with_html(html_content)
-        .with_initialization_script(&format!("{}\n{}", 
-            include_str!("tab.js"),
-            format!("console.log('Initialization script running...'); initializePage('{}');", url)
-        ))
+        .with_url(url)
+        .with_initialization_script(include_str!("tab.js"))
         .with_ipc_handler(move |request| {
             println!("IPC request received: {:?}", request);
             let request_body = request.body();
@@ -185,6 +196,9 @@ fn create_tab(window: &Window, context: &mut WebContext, url: &str, event_loop_p
                 }
             }
         })
+        .with_devtools(true)
+        .with_transparent(false)
+        .with_clipboard(true)
         .build()?;
     
     println!("Tab created successfully");
@@ -228,7 +242,7 @@ fn get_url_from_address_bar(webview: &WebView) -> Option<String> {
 }
 
 fn update_tab_ui(tabs: &[Tab], current_tab: usize) {
-    let tab_list = tabs.iter().enumerate().map(|(i, tab)| {
+    let _tab_list = tabs.iter().enumerate().map(|(i, _tab)| {
         format!("<div class='tab{}' onclick='switchTab({})'>Tab {}</div>",
             if i == current_tab { " active" } else { "" },
             i,
@@ -268,11 +282,7 @@ async fn handle_load_url_get(
                         let error_response = serde_json::json!({
                             "error": format!("Error following redirect: {}", e)
                         });
-                        return Ok(warp::reply::with_header(
-                            warp::reply::json(&error_response),
-                            "Content-Type",
-                            "application/json"
-                        ));
+                        return Ok(warp::reply::json(&error_response));
                     }
                 }
             }
@@ -285,22 +295,15 @@ async fn handle_load_url_get(
                 "baseUrl": result.url  // Use the final URL after potential redirects
             });
             println!("Server response (GET): {:?}", response);
-            Ok(warp::reply::with_header(
-                warp::reply::json(&response),
-                "Content-Type",
-                "application/json"
-            ))
+
+            Ok(warp::reply::json(&response))
         },
         Err(e) => {
             let error_response = serde_json::json!({
                 "error": format!("Error loading URL: {}", e)
             });
             println!("Server error response (GET): {:?}", error_response);
-            Ok(warp::reply::with_header(
-                warp::reply::json(&error_response),
-                "Content-Type",
-                "application/json"
-            ))
+            Ok(warp::reply::json(&error_response))
         },
     }
 }

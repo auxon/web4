@@ -55,12 +55,24 @@
             height: calc(100vh - 100px);
             overflow: auto;
         }
+        #new-tab-button {
+            padding: 5px 10px;
+            margin-right: 10px;
+            background-color: #e0e0e0;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        #new-tab-button:hover {
+            background-color: #d0d0d0;
+        }
     </style>
 </head>
 <body>
     <div id="browser-chrome">
         <div id="tab-bar"></div>
         <div id="toolbar">
+            <button id="new-tab-button">+</button>
             <input type="text" id="url-input" placeholder="Enter URL">
             <button id="go-button">Go</button>
         </div>

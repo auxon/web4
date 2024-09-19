@@ -42,8 +42,9 @@ function setupPage(initialUrl) {
 function setupEventListeners() {
     const urlInput = document.getElementById('url-input');
     const goButton = document.getElementById('go-button');
+    const newTabButton = document.getElementById('new-tab-button');
 
-    if (urlInput && goButton) {
+    if (urlInput && goButton && newTabButton) {
         urlInput.addEventListener('keydown', (event) => {
             if (event.key === 'Enter') {
                 event.preventDefault();
@@ -55,8 +56,13 @@ function setupEventListeners() {
             event.preventDefault();
             loadUrl(urlInput.value);
         });
+
+        newTabButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            createNewTab();
+        });
     } else {
-        console.error('URL input or Go button not found');
+        console.error('URL input, Go button, or New Tab button not found');
     }
 
     // Handle clicks on the entire document
@@ -94,14 +100,41 @@ function setupEventListeners() {
             loadUrl(fullUrl.toString());
         });
     });
+
+    // Handle clicks on buttons within forms
+    document.addEventListener('click', (event) => {
+        const target = event.target;
+        if (target.tagName === 'INPUT' && (target.type === 'submit' || target.type === 'button')) {
+            const form = target.closest('form');
+            if (form) {
+                event.preventDefault();
+                const formData = new FormData(form);
+                formData.append(target.name, target.value);
+                const searchParams = new URLSearchParams(formData);
+                const fullUrl = new URL(form.action);
+                fullUrl.search = searchParams.toString();
+                loadUrl(fullUrl.toString());
+            }
+        }
+    });
 }
 
 // Function to load URL
+let lastLoadedUrl = '';
+
 function loadUrl(url) {
     console.log("Loading URL:", url);
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
         url = 'https://' + url;
     }
+    
+    if (url === lastLoadedUrl) {
+        console.log("URL already loaded, skipping:", url);
+        return Promise.resolve();
+    }
+    
+    lastLoadedUrl = url;
+    
     return fetch('http://localhost:3030/load?url=' + encodeURIComponent(url))
         .then(response => response.json())
         .then(data => {
@@ -113,22 +146,40 @@ function loadUrl(url) {
                 document.getElementById('url-input').value = data.url || url;
                 console.log('Content loaded:', data.content ? data.content.substring(0, 100) + '...' : 'No content');
                 
-                // Fix relative URLs for images, links, and other resources
                 const baseUrl = new URL(data.url);
                 contentArea.querySelectorAll('*').forEach(el => {
                     ['src', 'href', 'action'].forEach(attr => {
                         if (el.hasAttribute(attr)) {
                             try {
-                                el.setAttribute(attr, new URL(el.getAttribute(attr), baseUrl).href);
+                                let attrValue = el.getAttribute(attr);
+                                if (attrValue.startsWith('//')) {
+                                    attrValue = 'https:' + attrValue;
+                                }
+                                el.setAttribute(attr, new URL(attrValue, baseUrl).href);
                             } catch (e) {
                                 console.error('Error updating attribute:', attr, 'for element:', el, 'Error:', e);
                             }
                         }
                     });
                 });
+
+                // Handle stylesheets
+                const stylesheets = contentArea.querySelectorAll('link[rel="stylesheet"]');
+                stylesheets.forEach(stylesheet => {
+                    const href = stylesheet.getAttribute('href');
+                    if (href) {
+                        fetch(new URL(href, baseUrl).href)
+                            .then(response => response.text())
+                            .then(css => {
+                                const style = document.createElement('style');
+                                style.textContent = css;
+                                stylesheet.parentNode.replaceChild(style, stylesheet);
+                            })
+                            .catch(error => console.error('Error loading stylesheet:', error));
+                    }
+                });
             }
 
-            // Reattach event listeners
             setupEventListeners();
         })
         .catch(error => {
