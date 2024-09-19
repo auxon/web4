@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body, html { margin: 0; padding: 0; height: 100%; }
+        #container { display: flex; flex-direction: column; height: 100%; }
+        #tab-bar { padding: 5px; background-color: #e0e0e0; }
+        #url-bar { padding: 10px; background-color: #f0f0f0; display: flex; }
+        #url-input { flex-grow: 1; padding: 5px; margin-right: 5px; }
+        #go-button { padding: 5px 10px; }
+        #main-content { display: flex; flex: 1; }
+        #content { flex: 7; overflow-y: auto; padding: 10px; }
+        #sidebar { flex: 3; padding: 10px; background-color: #f0f0f0; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="tab-bar"></div>
+        <div id="url-bar">
+            <input type="text" id="url-input" placeholder="Enter URL">
+            <button id="go-button">Go</button>
+        </div>
+        <div id="main-content">
+            <div id="content"></div>
+            <div id="sidebar">
+                <h2>Summary</h2>
+                <div id="summary"></div>
+                <h2>Analysis</h2>
+                <div id="analysis"></div>
+            </div>
+        </div>
+    </div>
+    <script src="tab.js"></script>
+</body>
+</html>

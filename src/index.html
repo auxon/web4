@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web4</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: Arial, sans-serif;
+        }
+        #browser-chrome {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background-color: #f0f0f0;
+            z-index: 1000;
+            display: block; /* Ensure it's always visible */
+        }
+        #tab-bar {
+            display: flex;
+            padding: 5px;
+            border-bottom: 1px solid #ccc;
+        }
+        .tab {
+            padding: 5px 10px;
+            margin-right: 5px;
+            cursor: pointer;
+            border: 1px solid #ccc;
+            border-bottom: none;
+            border-radius: 5px 5px 0 0;
+        }
+        .tab.active {
+            background-color: #fff;
+        }
+        #toolbar {
+            display: flex;
+            padding: 10px;
+            background-color: #f8f8f8;
+            border-bottom: 1px solid #ccc;
+        }
+        #url-input {
+            flex-grow: 1;
+            margin-right: 10px;
+            padding: 5px;
+        }
+        #go-button {
+            padding: 5px 10px;
+        }
+        #content-area {
+            margin-top: 100px; /* Adjust based on the height of your tab bar and toolbar */
+            height: calc(100vh - 100px);
+            overflow: auto;
+        }
+    </style>
+</head>
+<body>
+    <div id="browser-chrome">
+        <div id="tab-bar"></div>
+        <div id="toolbar">
+            <input type="text" id="url-input" placeholder="Enter URL">
+            <button id="go-button">Go</button>
+        </div>
+    </div>
+    <div id="content-area"></div>
+</body>
+</html>
